@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -16,5 +16,10 @@ class Category(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
+    parent: Mapped["Category | None"] = relationship(
+        "Category", back_populates="children", remote_side="Category.id"
+    )
+    children: Mapped[list["Category"]] = relationship("Category", back_populates="parent")
