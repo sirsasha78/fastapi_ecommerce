@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -12,11 +14,15 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-async def get_all_categories() -> dict[str, str]:
+@router.get("/", response_model=list[CategorySchema])
+async def get_all_categories(db: SessionDep) -> Sequence[CategoryModel]:
     """Возвращает список всех категорий товаров."""
 
-    return {"message": "Список всех категорий (заглушка)"}
+    stmt = select(CategoryModel).where(CategoryModel.is_active)
+    categories = db.scalars(stmt).all()
+    print(categories)
+
+    return categories
 
 
 @router.post("/", response_model=CategorySchema, status_code=status.HTTP_201_CREATED)
