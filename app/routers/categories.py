@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.db_depends import SessionDep
 from app.models.categories import Category as CategoryModel
@@ -48,11 +48,42 @@ async def create_category(category: CategoryCreate, db: SessionDep) -> CategoryM
     return db_category
 
 
-@router.put("/{category_id}")
-async def update_category(category_id: int) -> dict[str, str]:
+@router.put("/{category_id}", response_model=CategorySchema)
+async def update_category(
+    category_id: int, category: CategoryCreate, db: SessionDep
+) -> CategoryModel | None:
     """Обновляет категорию по её ID."""
 
-    return {"message": f"Категория с ID {category_id} обновлена (заглушка)"}
+    stmt = select(CategoryModel).where(
+        CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+    )
+    db_category = db.scalars(stmt).first()
+    if db_category is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Категория не найдена",
+        )
+
+    if category.parent_id is not None:
+        stmt_parent = select(CategoryModel).where(
+            CategoryModel.id == category.parent_id, CategoryModel.is_active.is_(True)
+        )
+        parent = db.scalars(stmt_parent).first()
+        if parent is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Родительская категория не найдена",
+            )
+
+    db.execute(
+        update(CategoryModel)
+        .where(CategoryModel.id == category_id)
+        .values(**category.model_dump())
+    )
+    db.commit()
+    db.refresh(db_category)
+
+    return db_category
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_200_OK)
