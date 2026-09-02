@@ -1,4 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
+
+from app.db_depends import SessionDep
+from app.models.categories import Category as CategoryModel
+from app.schemas import Category as CategorySchema
+from app.schemas import CategoryCreate
 
 router = APIRouter(
     prefix="/categories",
@@ -13,11 +19,27 @@ async def get_all_categories() -> dict[str, str]:
     return {"message": "Список всех категорий (заглушка)"}
 
 
-@router.post("/")
-async def create_category() -> dict[str, str]:
+@router.post("/", response_model=CategorySchema, status_code=status.HTTP_201_CREATED)
+async def create_category(category: CategoryCreate, db: SessionDep) -> CategoryModel:
     """Создаёт новую категорию."""
 
-    return {"message": "Категория создана (заглушка)"}
+    if category.parent_id is not None:
+        stmt = select(CategoryModel).where(
+            CategoryModel.id == category.parent_id, CategoryModel.is_active
+        )
+        parent = db.scalars(stmt).first()
+        if parent is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Родительская категория не найдена",
+            )
+
+    db_category = CategoryModel(**category.model_dump())
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+
+    return db_category
 
 
 @router.put("/{category_id}")
