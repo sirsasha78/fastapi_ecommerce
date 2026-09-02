@@ -18,7 +18,7 @@ router = APIRouter(
 async def get_all_categories(db: SessionDep) -> Sequence[CategoryModel]:
     """Возвращает список всех категорий товаров."""
 
-    stmt = select(CategoryModel).where(CategoryModel.is_active)
+    stmt = select(CategoryModel).where(CategoryModel.is_active.is_(True))
     categories = db.scalars(stmt).all()
     print(categories)
 
@@ -31,7 +31,7 @@ async def create_category(category: CategoryCreate, db: SessionDep) -> CategoryM
 
     if category.parent_id is not None:
         stmt = select(CategoryModel).where(
-            CategoryModel.id == category.parent_id, CategoryModel.is_active
+            CategoryModel.id == category.parent_id, CategoryModel.is_active.is_(True)
         )
         parent = db.scalars(stmt).first()
         if parent is None:
@@ -55,8 +55,21 @@ async def update_category(category_id: int) -> dict[str, str]:
     return {"message": f"Категория с ID {category_id} обновлена (заглушка)"}
 
 
-@router.delete("/{category_id}")
-async def delete_category(category_id: int) -> dict[str, str]:
+@router.delete("/{category_id}", status_code=status.HTTP_200_OK)
+async def delete_category(category_id: int, db: SessionDep) -> dict[str, str]:
     """Удаляет категорию по её ID."""
 
-    return {"message": f"Категория с ID {category_id} удалена (заглушка)"}
+    stmt = select(CategoryModel).where(
+        CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+    )
+    category = db.scalars(stmt).first()
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Категория не найдена",
+        )
+
+    category.is_active = False
+    db.commit()
+
+    return {"status": "success", "message": "Категория помечена как неактивная"}
