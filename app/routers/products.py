@@ -47,11 +47,26 @@ async def create_product(product: ProductCreate, db: SessionDep) -> ProductModel
     return db_product
 
 
-@router.get("/category/{category_id}")
-async def get_products_by_category(category_id: int) -> dict[str, str]:
+@router.get("/category/{category_id}", response_model=list[ProductSchema])
+async def get_products_by_category(category_id: int, db: SessionDep) -> Sequence[ProductModel]:
     """Возвращает список товаров в указанной категории по её ID."""
 
-    return {"message": f"Товары в категории {category_id} (заглушка)"}
+    stmt_category = select(CategoryModel).where(
+        CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+    )
+    category = db.scalars(stmt_category).first()
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Категория не найдена или неактивна",
+        )
+
+    stmt = select(ProductModel).where(
+        ProductModel.category_id == category_id, ProductModel.is_active.is_(True)
+    )
+    products = db.scalars(stmt).all()
+
+    return products
 
 
 @router.get("/{product_id}")
