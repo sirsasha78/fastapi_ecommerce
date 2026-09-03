@@ -134,7 +134,21 @@ async def update_product(product_id: int, product: ProductCreate, db: SessionDep
 
 
 @router.delete("/{product_id}")
-async def delete_product(product_id: int) -> dict[str, str]:
+async def delete_product(product_id: int, db: SessionDep) -> dict[str, str]:
     """Удаляет товар по его ID."""
 
-    return {"message": f"Товар с ID {product_id} удален (заглушка)"}
+    product = db.scalars(
+        select(ProductModel).where(
+            ProductModel.id == product_id, ProductModel.is_active.is_(True)
+        )
+    ).first()
+    if product is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Продукт не найден или неактивен",
+        )
+
+    product.is_active = False
+    db.commit()
+
+    return {"status": "success", "message": "Продукт помечен как неактивный"}
