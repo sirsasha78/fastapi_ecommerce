@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.db_depends import SessionDep
 from app.models import Category as CategoryModel
@@ -98,11 +98,39 @@ async def get_product(product_id: int, db: SessionDep) -> ProductModel:
     return product
 
 
-@router.put("/{product_id}")
-async def update_product(product_id: int) -> dict[str, str]:
+@router.put("/{product_id}", response_model=ProductSchema)
+async def update_product(product_id: int, product: ProductCreate, db: SessionDep) -> ProductModel:
     """Обновляет товар по его ID."""
 
-    return {"message": f"Товар с ID {product_id} обновлен (заглушка)"}
+    db_product = db.scalars(
+        select(ProductModel).where(
+            ProductModel.id == product_id, ProductModel.is_active.is_(True)
+        )
+    ).first()
+    if db_product is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Продукт не найден или неактивен",
+        )
+
+    category = db.scalars(
+        select(CategoryModel).where(
+            CategoryModel.id == product.category_id, CategoryModel.is_active.is_(True)
+        )
+    ).first()
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Категория не найдена или неактивна",
+        )
+
+    db.execute(
+        update(ProductModel).where(ProductModel.id == product_id).values(**product.model_dump())
+    )
+    db.commit()
+    db.refresh(db_product)
+
+    return db_product
 
 
 @router.delete("/{product_id}")
