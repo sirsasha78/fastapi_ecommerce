@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -13,11 +15,14 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-async def get_all_products() -> dict[str, str]:
+@router.get("/", response_model=list[ProductSchema])
+async def get_all_products(db: SessionDep) -> Sequence[ProductModel]:
     """Возвращает список всех товаров."""
 
-    return {"message": "Список всех товаров (заглушка)"}
+    stmt = select(ProductModel).where(ProductModel.is_active.is_(True))
+    products = db.scalars(stmt).all()
+
+    return products
 
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)

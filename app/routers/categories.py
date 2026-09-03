@@ -20,7 +20,6 @@ async def get_all_categories(db: SessionDep) -> Sequence[CategoryModel]:
 
     stmt = select(CategoryModel).where(CategoryModel.is_active.is_(True))
     categories = db.scalars(stmt).all()
-    print(categories)
 
     return categories
 
