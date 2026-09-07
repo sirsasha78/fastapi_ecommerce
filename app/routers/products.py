@@ -18,6 +18,7 @@ router = APIRouter(
 
 async def get_product_or_404(product_id: int, db: SessionDep) -> ProductModel:
     """Вспомогательная функция для получения продукта"""
+
     product = db.scalars(
         select(ProductModel).where(
             ProductModel.id == product_id, ProductModel.is_active.is_(True)

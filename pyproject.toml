@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.19.1",
+    "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
+    "greenlet>=3.5.5",
     "mypy>=2.3.1",
     "sqlalchemy>=2.0.52",
     "uvicorn[standard]>=0.52.4",
