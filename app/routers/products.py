@@ -81,10 +81,11 @@ ProductCategoryDep = Annotated[CategoryModel, Depends(check_category_from_produc
 
 
 @router.get("/", response_model=list[ProductSchema])
-async def get_all_products(db: SessionDep) -> Sequence[ProductModel]:
+async def get_all_products(db: AsyncSessionDep) -> Sequence[ProductModel]:
     """Возвращает список всех товаров."""
 
-    products = db.scalars(select(ProductModel).where(ProductModel.is_active.is_(True))).all()
+    result = await db.scalars(select(ProductModel).where(ProductModel.is_active.is_(True)))
+    products = result.all()
 
     return products
 
