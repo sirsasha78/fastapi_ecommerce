@@ -96,8 +96,8 @@ async def update_category(
     return db_category
 
 
-@router.delete("/{category_id}", status_code=status.HTTP_200_OK)
-async def delete_category(category_id: int, db: AsyncSessionDep) -> dict[str, str]:
+@router.delete("/{category_id}", status_code=status.HTTP_200_OK, response_model=CategorySchema)
+async def delete_category(category_id: int, db: AsyncSessionDep) -> CategoryModel:
     """Удаляет категорию по её ID."""
 
     result = await db.scalars(
@@ -115,5 +115,6 @@ async def delete_category(category_id: int, db: AsyncSessionDep) -> dict[str, st
 
     category.is_active = False
     await db.commit()
+    await db.refresh(category)
 
-    return {"status": "success", "message": "Категория помечена как неактивная"}
+    return category

@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 
-from app.db_depends import AsyncSessionDep, SessionDep
+from app.db_depends import AsyncSessionDep
 from app.models import Category as CategoryModel
 from app.models import Product as ProductModel
 from app.schemas import Product as ProductSchema
@@ -158,11 +158,12 @@ async def update_product(
     return product
 
 
-@router.delete("/{product_id}")
-async def delete_product(db: SessionDep, product: ProductDep) -> dict[str, str]:
+@router.delete("/{product_id}", response_model=ProductSchema, status_code=status.HTTP_200_OK)
+async def delete_product(db: AsyncSessionDep, product: ProductDep) -> ProductModel:
     """Удаляет товар по его ID."""
 
     product.is_active = False
-    db.commit()
+    await db.commit()
+    await db.refresh(product)
 
-    return {"status": "success", "message": "Продукт помечен как неактивный"}
+    return product
