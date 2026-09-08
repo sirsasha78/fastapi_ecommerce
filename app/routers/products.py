@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 
-from app.db_depends import SessionDep
+from app.db_depends import AsyncSessionDep, SessionDep
 from app.models import Category as CategoryModel
 from app.models import Product as ProductModel
 from app.schemas import Product as ProductSchema
@@ -16,14 +16,16 @@ router = APIRouter(
 )
 
 
-async def get_product_or_404(product_id: int, db: SessionDep) -> ProductModel:
+async def get_product_or_404(product_id: int, db: AsyncSessionDep) -> ProductModel:
     """Вспомогательная функция для получения продукта"""
 
-    product = db.scalars(
+    result = await db.scalars(
         select(ProductModel).where(
             ProductModel.id == product_id, ProductModel.is_active.is_(True)
         )
-    ).first()
+    )
+    product = result.first()
+
     if product is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -33,14 +35,16 @@ async def get_product_or_404(product_id: int, db: SessionDep) -> ProductModel:
     return product
 
 
-async def get_category_or_404(category_id: int, db: SessionDep) -> CategoryModel:
+async def get_category_or_404(category_id: int, db: AsyncSessionDep) -> CategoryModel:
     """Вспомогательная функция для получения категории"""
 
-    category = db.scalars(
+    result = await db.scalars(
         select(CategoryModel).where(
             CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
         )
-    ).first()
+    )
+    category = result.first()
+
     if category is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -50,14 +54,18 @@ async def get_category_or_404(category_id: int, db: SessionDep) -> CategoryModel
     return category
 
 
-async def check_category_from_product(product: ProductCreate, db: SessionDep) -> CategoryModel:
+async def check_category_from_product(
+    product: ProductCreate, db: AsyncSessionDep
+) -> CategoryModel:
     """Вспомогательная функция для получения категории из тела запроса."""
 
-    category = db.scalars(
+    result = await db.scalars(
         select(CategoryModel).where(
             CategoryModel.id == product.category_id, CategoryModel.is_active.is_(True)
         )
-    ).first()
+    )
+    category = result.first()
+
     if category is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -83,14 +91,14 @@ async def get_all_products(db: SessionDep) -> Sequence[ProductModel]:
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
 async def create_product(
-    product: ProductCreate, db: SessionDep, _category: ProductCategoryDep
+    product: ProductCreate, db: AsyncSessionDep, _category: ProductCategoryDep
 ) -> ProductModel:
     """Создаёт новый товар."""
 
     db_product = ProductModel(**product.model_dump())
     db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
+    await db.commit()
+    await db.refresh(db_product)
 
     return db_product
 
