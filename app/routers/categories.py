@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, update
 
-from app.db_depends import SessionDep
+from app.db_depends import AsyncSessionDep, SessionDep
 from app.models.categories import Category as CategoryModel
 from app.schemas import Category as CategorySchema
 from app.schemas import CategoryCreate
@@ -25,14 +25,15 @@ async def get_all_categories(db: SessionDep) -> Sequence[CategoryModel]:
 
 
 @router.post("/", response_model=CategorySchema, status_code=status.HTTP_201_CREATED)
-async def create_category(category: CategoryCreate, db: SessionDep) -> CategoryModel:
+async def create_category(category: CategoryCreate, db: AsyncSessionDep) -> CategoryModel:
     """Создаёт новую категорию."""
 
     if category.parent_id is not None:
         stmt = select(CategoryModel).where(
             CategoryModel.id == category.parent_id, CategoryModel.is_active.is_(True)
         )
-        parent = db.scalars(stmt).first()
+        result = await db.scalars(stmt)
+        parent = result.first()
         if parent is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -41,9 +42,7 @@ async def create_category(category: CategoryCreate, db: SessionDep) -> CategoryM
 
     db_category = CategoryModel(**category.model_dump())
     db.add(db_category)
-    db.commit()
-    db.refresh(db_category)
-
+    await db.commit()
     return db_category
 
 
