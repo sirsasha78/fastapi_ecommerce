@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, update
 
-from app.db_depends import AsyncSessionDep, SessionDep
+from app.db_depends import AsyncSessionDep
 from app.models.categories import Category as CategoryModel
 from app.schemas import Category as CategorySchema
 from app.schemas import CategoryCreate
@@ -97,13 +97,16 @@ async def update_category(
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_200_OK)
-async def delete_category(category_id: int, db: SessionDep) -> dict[str, str]:
+async def delete_category(category_id: int, db: AsyncSessionDep) -> dict[str, str]:
     """Удаляет категорию по её ID."""
 
-    stmt = select(CategoryModel).where(
-        CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+    result = await db.scalars(
+        select(CategoryModel).where(
+            CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+        )
     )
-    category = db.scalars(stmt).first()
+    category = result.first()
+
     if category is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -111,6 +114,6 @@ async def delete_category(category_id: int, db: SessionDep) -> dict[str, str]:
         )
 
     category.is_active = False
-    db.commit()
+    await db.commit()
 
     return {"status": "success", "message": "Категория помечена как неактивная"}
