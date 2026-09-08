@@ -15,11 +15,11 @@ router = APIRouter(
 
 
 @router.get("/", response_model=list[CategorySchema])
-async def get_all_categories(db: SessionDep) -> Sequence[CategoryModel]:
+async def get_all_categories(db: AsyncSessionDep) -> Sequence[CategoryModel]:
     """Возвращает список всех категорий товаров."""
 
-    stmt = select(CategoryModel).where(CategoryModel.is_active.is_(True))
-    categories = db.scalars(stmt).all()
+    result = await db.scalars(select(CategoryModel).where(CategoryModel.is_active.is_(True)))
+    categories = result.all()
 
     return categories
 
