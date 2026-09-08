@@ -43,19 +43,24 @@ async def create_category(category: CategoryCreate, db: AsyncSessionDep) -> Cate
     db_category = CategoryModel(**category.model_dump())
     db.add(db_category)
     await db.commit()
+    await db.refresh(db_category)
+
     return db_category
 
 
 @router.put("/{category_id}", response_model=CategorySchema)
 async def update_category(
-    category_id: int, category: CategoryCreate, db: SessionDep
+    category_id: int, category: CategoryCreate, db: AsyncSessionDep
 ) -> CategoryModel | None:
     """Обновляет категорию по её ID."""
 
-    stmt = select(CategoryModel).where(
-        CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+    result = await db.scalars(
+        select(CategoryModel).where(
+            CategoryModel.id == category_id, CategoryModel.is_active.is_(True)
+        )
     )
-    db_category = db.scalars(stmt).first()
+    db_category = result.first()
+
     if db_category is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -66,20 +71,27 @@ async def update_category(
         stmt_parent = select(CategoryModel).where(
             CategoryModel.id == category.parent_id, CategoryModel.is_active.is_(True)
         )
-        parent = db.scalars(stmt_parent).first()
+        parent_result = await db.scalars(stmt_parent)
+        parent = parent_result.first()
+
         if parent is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Родительская категория не найдена",
             )
+        if parent.id == category_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Категория не может быть родительской для самой себя",
+            )
 
-    db.execute(
+    await db.execute(
         update(CategoryModel)
         .where(CategoryModel.id == category_id)
         .values(**category.model_dump())
     )
-    db.commit()
-    db.refresh(db_category)
+    await db.commit()
+    await db.refresh(db_category)
 
     return db_category
 
