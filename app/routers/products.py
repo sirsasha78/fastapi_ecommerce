@@ -32,6 +32,18 @@ async def get_product_or_404(product_id: int, db: AsyncSessionDep) -> ProductMod
             detail="Продукт не найден или неактивен",
         )
 
+    category_result = await db.scalars(
+        select(CategoryModel).where(
+            CategoryModel.id == product.category_id, CategoryModel.is_active.is_(True)
+        )
+    )
+    category = category_result.first()
+    if category is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Категория не найдена или неактивна",
+        )
+
     return product
 
 
@@ -129,19 +141,19 @@ async def get_product(product: ProductDep) -> ProductModel:
 
 @router.put("/{product_id}", response_model=ProductSchema)
 async def update_product(
-    product_id: int, product_create: ProductCreate, db: SessionDep, product: ProductDep
+    product_id: int, product_create: ProductCreate, db: AsyncSessionDep, product: ProductDep
 ) -> ProductModel:
     """Обновляет товар по его ID."""
 
     await check_category_from_product(product_create, db)
 
-    db.execute(
+    await db.execute(
         update(ProductModel)
         .where(ProductModel.id == product_id)
         .values(**product_create.model_dump())
     )
-    db.commit()
-    db.refresh(product)
+    await db.commit()
+    await db.refresh(product)
 
     return product
 
