@@ -106,15 +106,16 @@ async def create_product(
 
 @router.get("/category/{category_id}", response_model=list[ProductSchema])
 async def get_products_by_category(
-    category_id: int, db: SessionDep, _category: CategoryDep
+    category_id: int, db: AsyncSessionDep, _category: CategoryDep
 ) -> Sequence[ProductModel]:
     """Возвращает список товаров в указанной категории по её ID."""
 
-    products = db.scalars(
+    result = await db.scalars(
         select(ProductModel).where(
             ProductModel.category_id == category_id, ProductModel.is_active.is_(True)
         )
-    ).all()
+    )
+    products = result.all()
 
     return products
 
