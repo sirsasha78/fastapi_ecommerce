@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, update
 
@@ -15,13 +13,13 @@ router = APIRouter(
 
 
 @router.get("/", response_model=list[CategorySchema])
-async def get_all_categories(db: AsyncSessionDep) -> Sequence[CategoryModel]:
+async def get_all_categories(db: AsyncSessionDep) -> list[CategoryModel]:
     """Возвращает список всех категорий товаров."""
 
     result = await db.scalars(select(CategoryModel).where(CategoryModel.is_active.is_(True)))
     categories = result.all()
 
-    return categories
+    return list(categories)
 
 
 @router.post("/", response_model=CategorySchema, status_code=status.HTTP_201_CREATED)

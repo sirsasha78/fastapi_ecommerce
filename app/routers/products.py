@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -93,13 +92,13 @@ ProductCategoryDep = Annotated[CategoryModel, Depends(check_category_from_produc
 
 
 @router.get("/", response_model=list[ProductSchema])
-async def get_all_products(db: AsyncSessionDep) -> Sequence[ProductModel]:
+async def get_all_products(db: AsyncSessionDep) -> list[ProductModel]:
     """Возвращает список всех товаров."""
 
     result = await db.scalars(select(ProductModel).where(ProductModel.is_active.is_(True)))
     products = result.all()
 
-    return products
+    return list(products)
 
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
@@ -119,7 +118,7 @@ async def create_product(
 @router.get("/category/{category_id}", response_model=list[ProductSchema])
 async def get_products_by_category(
     category_id: int, db: AsyncSessionDep, _category: CategoryDep
-) -> Sequence[ProductModel]:
+) -> list[ProductModel]:
     """Возвращает список товаров в указанной категории по её ID."""
 
     result = await db.scalars(
@@ -129,7 +128,7 @@ async def get_products_by_category(
     )
     products = result.all()
 
-    return products
+    return list(products)
 
 
 @router.get("/{product_id}", response_model=ProductSchema)
