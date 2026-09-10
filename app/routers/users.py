@@ -20,6 +20,44 @@ router = APIRouter(
 FormDataDep = Annotated[OAuth2PasswordRequestForm, Depends()]
 
 
+async def check_refresh_token(body: RefreshTokenRequest, db: AsyncSessionDep) -> UserModel:
+    """Функция для проверки refresh-токена"""
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Не удалось проверить токен обновления",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    old_refresh_token = body.refresh_token
+
+    try:
+        payload = jwt.decode(old_refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str | None = payload.get("sub")
+        token_type: str | None = payload.get("token_type")
+
+        if email is None or token_type != "refresh":
+            raise credentials_exception
+
+    except jwt.ExpiredSignatureError:
+        raise credentials_exception from None
+
+    except jwt.PyJWTError:
+        raise credentials_exception from None
+
+    result = await db.scalars(
+        select(UserModel).where(UserModel.email == email, UserModel.is_active.is_(True))
+    )
+    user = result.first()
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+CheckRefreshToken = Annotated[UserModel, Depends(check_refresh_token)]
+
+
 @router.post("/", response_model=UserSchema, status_code=status.HTTP_201_CREATED)
 async def create_user(user_create: UserCreate, db: AsyncSessionDep) -> UserModel:
     """Регистрирует нового пользователя с ролью 'buyer' или 'seller'."""
@@ -68,37 +106,8 @@ async def login(form_data: FormDataDep, db: AsyncSessionDep) -> dict[str, str]:
 
 
 @router.post("/refresh-token")
-async def refresh_token(body: RefreshTokenRequest, db: AsyncSessionDep) -> dict[str, str]:
+async def refresh_token(user: CheckRefreshToken) -> dict[str, str]:
     """Обновляет refresh-токен, принимая старый refresh-токен в теле запроса."""
-
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не удалось проверить токен обновления",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    old_refresh_token = body.refresh_token
-
-    try:
-        payload = jwt.decode(old_refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str | None = payload.get("sub")
-        token_type: str | None = payload.get("token_type")
-
-        if email is None or token_type != "refresh":
-            raise credentials_exception
-
-    except jwt.ExpiredSignatureError:
-        raise credentials_exception from None
-
-    except jwt.PyJWTError:
-        raise credentials_exception from None
-
-    result = await db.scalars(
-        select(UserModel).where(UserModel.email == email, UserModel.is_active.is_(True))
-    )
-    user = result.first()
-    if user is None:
-        raise credentials_exception
 
     new_refresh_token = create_refresh_token(
         data={"sub": user.email, "role": user.role, "id": user.id}
@@ -106,5 +115,19 @@ async def refresh_token(body: RefreshTokenRequest, db: AsyncSessionDep) -> dict[
 
     return {
         "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/access-token")
+async def access_token(user: CheckRefreshToken) -> dict[str, str]:
+    """Обновляет access-токен, принимая старый refresh-токен в теле запроса."""
+
+    new_access_token = create_access_token(
+        data={"sub": user.email, "role": user.role, "id": user.id}
+    )
+
+    return {
+        "access_token": new_access_token,
         "token_type": "bearer",
     }
