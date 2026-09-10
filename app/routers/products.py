@@ -3,9 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 
+from app.auth import CurrentSellerDep
 from app.db_depends import AsyncSessionDep
-from app.models import Category as CategoryModel
-from app.models import Product as ProductModel
+from app.models.categories import Category as CategoryModel
+from app.models.products import Product as ProductModel
 from app.schemas import Product as ProductSchema
 from app.schemas import ProductCreate
 
@@ -103,11 +104,14 @@ async def get_all_products(db: AsyncSessionDep) -> list[ProductModel]:
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
 async def create_product(
-    product: ProductCreate, db: AsyncSessionDep, _category: ProductCategoryDep
+    product: ProductCreate,
+    db: AsyncSessionDep,
+    _category: ProductCategoryDep,
+    current_user: CurrentSellerDep,
 ) -> ProductModel:
-    """Создаёт новый товар."""
+    """Создаёт новый товар, привязанный к текущему продавцу (только для 'seller')."""
 
-    db_product = ProductModel(**product.model_dump())
+    db_product = ProductModel(**product.model_dump(), seller_id=current_user.id)
     db.add(db_product)
     await db.commit()
     await db.refresh(db_product)
@@ -140,9 +144,19 @@ async def get_product(product: ProductDep) -> ProductModel:
 
 @router.put("/{product_id}", response_model=ProductSchema)
 async def update_product(
-    product_id: int, product_create: ProductCreate, db: AsyncSessionDep, product: ProductDep
+    product_id: int,
+    product_create: ProductCreate,
+    db: AsyncSessionDep,
+    product: ProductDep,
+    current_user: CurrentSellerDep,
 ) -> ProductModel:
-    """Обновляет товар по его ID."""
+    """Обновляет товар, если он принадлежит текущему продавцу (только для 'seller')."""
+
+    if product.seller_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Вы можете обновлять только свои собственные продукты",
+        )
 
     await check_category_from_product(product_create, db)
 
@@ -158,8 +172,18 @@ async def update_product(
 
 
 @router.delete("/{product_id}", response_model=ProductSchema, status_code=status.HTTP_200_OK)
-async def delete_product(db: AsyncSessionDep, product: ProductDep) -> ProductModel:
-    """Удаляет товар по его ID."""
+async def delete_product(
+    db: AsyncSessionDep, product: ProductDep, current_user: CurrentSellerDep
+) -> ProductModel:
+    """
+    Выполняет мягкое удаление товара, если он принадлежит текущему продавцу (только для 'seller').
+    """
+
+    if product.seller_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Вы можете удалять только свои собственные продукты",
+        )
 
     product.is_active = False
     await db.commit()
