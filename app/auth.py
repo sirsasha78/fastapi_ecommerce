@@ -14,6 +14,7 @@ from app.models.users import User as UserModel
 password_hash = PasswordHash.recommended()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/token")
 
@@ -37,7 +38,27 @@ def create_access_token(data: dict) -> str:
 
     to_encode = data.copy()
     expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    to_encode.update(
+        {
+            "exp": expire,
+            "token_type": "access",
+        }
+    )
+
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(data: dict) -> str:
+    """Создаёт refresh-токен с длительным сроком действия и token_type="refresh"."""
+
+    to_encode = data.copy()
+    expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update(
+        {
+            "exp": expire,
+            "token_type": "refresh",
+        }
+    )
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -54,7 +75,9 @@ async def get_current_user(token: TokenDep, db: AsyncSessionDep) -> UserModel:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str | None = payload.get("sub")
-        if not email:
+        token_type: str | None = payload.get("token_type")
+
+        if email is None or token_type != "access":
             raise credentials_exception
     except jwt.ExpiredSignatureError:
         raise HTTPException(

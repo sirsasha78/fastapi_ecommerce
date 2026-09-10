@@ -81,3 +81,9 @@ class User(BaseModel):
     is_active: bool
     role: str
     model_config = ConfigDict(from_attributes=True)
+
+
+class RefreshTokenRequest(BaseModel):
+    """Модель для обновления refresh-токена"""
+
+    refresh_token: str
