@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, update
 
+from app.auth import CurrentAdminDep
 from app.db_depends import AsyncSessionDep
 from app.models.categories import Category as CategoryModel
 from app.schemas import Category as CategorySchema
@@ -23,7 +24,9 @@ async def get_all_categories(db: AsyncSessionDep) -> list[CategoryModel]:
 
 
 @router.post("/", response_model=CategorySchema, status_code=status.HTTP_201_CREATED)
-async def create_category(category: CategoryCreate, db: AsyncSessionDep) -> CategoryModel:
+async def create_category(
+    category: CategoryCreate, db: AsyncSessionDep, _current_user: CurrentAdminDep
+) -> CategoryModel:
     """Создаёт новую категорию."""
 
     if category.parent_id is not None:
@@ -48,7 +51,10 @@ async def create_category(category: CategoryCreate, db: AsyncSessionDep) -> Cate
 
 @router.put("/{category_id}", response_model=CategorySchema)
 async def update_category(
-    category_id: int, category: CategoryCreate, db: AsyncSessionDep
+    category_id: int,
+    category: CategoryCreate,
+    db: AsyncSessionDep,
+    _current_user: CurrentAdminDep,
 ) -> CategoryModel | None:
     """Обновляет категорию по её ID."""
 
@@ -95,7 +101,9 @@ async def update_category(
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_200_OK, response_model=CategorySchema)
-async def delete_category(category_id: int, db: AsyncSessionDep) -> CategoryModel:
+async def delete_category(
+    category_id: int, db: AsyncSessionDep, _current_user: CurrentAdminDep
+) -> CategoryModel:
     """Удаляет категорию по её ID."""
 
     result = await db.scalars(
