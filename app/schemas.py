@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
@@ -87,3 +88,23 @@ class RefreshTokenRequest(BaseModel):
     """Модель для обновления refresh-токена"""
 
     refresh_token: str
+
+
+class ReviewCreate(BaseModel):
+    """Модель для создания отзыва."""
+
+    product_id: Annotated[int, Field(description="ID товара, к которому относится отзыв")]
+    comment: Annotated[
+        str | None, Field(default=None, max_length=4000, description="Текст отзыва")
+    ]
+    grade: Annotated[int, Field(ge=1, le=5, description="Оценка товара от 1 до 5")]
+
+
+class ReviewRead(ReviewCreate):
+    """Модель для ответа с данными отзыва."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: Annotated[int, Field(description="Уникальный идентификатор отзыва")]
+    user_id: Annotated[int, Field(description="ID пользователя, который оставил отзыв")]
+    comment_date: Annotated[datetime, Field(description="Дата и время создания отзыва")]
+    is_active: Annotated[bool, Field(description="Активность отзыва")]
