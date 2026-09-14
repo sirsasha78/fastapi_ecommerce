@@ -1,7 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import desc, select, update
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import desc, func, select, update
 
 from app.auth import CurrentSellerDep
 from app.db_depends import AsyncSessionDep
@@ -9,7 +9,7 @@ from app.models.categories import Category as CategoryModel
 from app.models.products import Product as ProductModel
 from app.models.reviews import Review as ReviewModel
 from app.schemas import Product as ProductSchema
-from app.schemas import ProductCreate, ReviewRead
+from app.schemas import ProductCreate, ProductList, ReviewRead
 
 router = APIRouter(
     prefix="/products",
@@ -93,14 +93,32 @@ CategoryDep = Annotated[CategoryModel, Depends(get_category_or_404)]
 ProductCategoryDep = Annotated[CategoryModel, Depends(check_category_from_product)]
 
 
-@router.get("/", response_model=list[ProductSchema])
-async def get_all_products(db: AsyncSessionDep) -> list[ProductModel]:
-    """Возвращает список всех товаров."""
+@router.get("/", response_model=ProductList)
+async def get_all_products(
+    db: AsyncSessionDep, page: int = Query(1, ge=1), page_size: int = Query(20, le=100)
+) -> ProductList:
+    """Возвращает список всех активных товаров."""
 
-    result = await db.scalars(select(ProductModel).where(ProductModel.is_active.is_(True)))
-    products = result.all()
+    total_stmt = (
+        select(func.count()).select_from(ProductModel).where(ProductModel.is_active.is_(True))
+    )
+    total = await db.scalar(total_stmt) or 0
 
-    return list(products)
+    product_stmt = await db.scalars(
+        select(ProductModel)
+        .where(ProductModel.is_active.is_(True))
+        .order_by(ProductModel.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    items = [ProductSchema.model_validate(p) for p in product_stmt.all()]
+
+    return ProductList(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
