@@ -1,14 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import desc, select, update
 
 from app.auth import CurrentSellerDep
 from app.db_depends import AsyncSessionDep
 from app.models.categories import Category as CategoryModel
 from app.models.products import Product as ProductModel
+from app.models.reviews import Review as ReviewModel
 from app.schemas import Product as ProductSchema
-from app.schemas import ProductCreate
+from app.schemas import ProductCreate, ReviewRead
 
 router = APIRouter(
     prefix="/products",
@@ -140,6 +141,18 @@ async def get_product(product: ProductDep) -> ProductModel:
     """Возвращает детальную информацию о товаре по его ID."""
 
     return product
+
+
+@router.get("/{product_id}/reviews", response_model=list[ReviewRead])
+async def get_reviews_by_product(db: AsyncSessionDep, product: ProductDep) -> list[ReviewModel]:
+    """Получение отзывов о конкретном товаре"""
+
+    result = await db.scalars(
+        select(ReviewModel)
+        .where(ReviewModel.product_id == product.id, ReviewModel.is_active.is_(True))
+        .order_by(desc(ReviewModel.comment_date))
+    )
+    return list(result.all())
 
 
 @router.put("/{product_id}", response_model=ProductSchema)
