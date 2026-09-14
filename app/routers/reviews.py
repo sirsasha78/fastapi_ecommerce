@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.sql import func
 
 from app.auth import CurrentBuyerDep
@@ -30,6 +30,20 @@ async def update_product_rating(db: AsyncSessionDep, product_id: int) -> None:
 
     product.rating = avg_rating
     await db.commit()
+
+
+@router.get("/", response_model=list[ReviewRead])
+async def get_all_reviews(db: AsyncSessionDep) -> list[ReviewModel]:
+    """Возвращает список всех отзывов."""
+
+    result = await db.scalars(
+        select(ReviewModel)
+        .where(ReviewModel.is_active.is_(True))
+        .order_by(desc(ReviewModel.comment_date))
+    )
+    reviews = result.all()
+
+    return list(reviews)
 
 
 @router.post("/", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)
