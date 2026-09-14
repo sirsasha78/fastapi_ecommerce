@@ -58,6 +58,7 @@ class Product(ProductCreate):
 
     id: Annotated[int, Field(description="Уникальный идентификатор товара")]
     is_active: Annotated[bool, Field(description="Активность товара")]
+    rating: Annotated[float, Field(description="Рэйтинг товара")]
     model_config = ConfigDict(from_attributes=True)
 
 

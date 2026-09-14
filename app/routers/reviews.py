@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.sql import func
 
-from app.auth import CurrentBuyerDep
+from app.auth import CurrentBuyerDep, CurrentUserDep
 from app.db_depends import AsyncSessionDep
 from app.models import Product as ProductModel
 from app.models import Review as ReviewModel
@@ -84,3 +84,32 @@ async def create_review(
     await update_product_rating(db, review.product_id)
 
     return db_review
+
+
+@router.delete("/{review_id}")
+async def delete_review(
+    review_id: int, db: AsyncSessionDep, current_user: CurrentUserDep
+) -> dict[str, str]:
+    """Мягкое удаление отзыва. Доступно автору или админу."""
+
+    result = await db.scalars(
+        select(ReviewModel).where(ReviewModel.id == review_id, ReviewModel.is_active.is_(True))
+    )
+    review = result.first()
+    if review is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Отзыв не найден или не активен",
+        )
+
+    if review.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет прав на удаление этого отзыва",
+        )
+
+    review.is_active = False
+    await db.commit()
+    await update_product_rating(db, review.product_id)
+
+    return {"message": "Отзыв удалён"}
