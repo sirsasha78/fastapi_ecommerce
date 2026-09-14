@@ -130,3 +130,18 @@ async def get_current_admin(current_user: CurrentUserDep) -> UserModel:
 
 
 CurrentAdminDep = Annotated[UserModel, Depends(get_current_admin)]
+
+
+async def get_current_buyer(current_user: CurrentUserDep) -> UserModel:
+    """Проверяет, что пользователь имеет роль 'buyer'."""
+
+    if current_user.role != "buyer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только покупатели могут выполнить это действие",
+        )
+
+    return current_user
+
+
+CurrentBuyerDep = Annotated[UserModel, Depends(get_current_buyer)]
