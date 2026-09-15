@@ -95,18 +95,44 @@ ProductCategoryDep = Annotated[CategoryModel, Depends(check_category_from_produc
 
 @router.get("/", response_model=ProductList)
 async def get_all_products(
-    db: AsyncSessionDep, page: int = Query(1, ge=1), page_size: int = Query(20, le=100)
+    db: AsyncSessionDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, le=100),
+    category_id: int | None = Query(None, description="ID категории для фильтрации"),
+    min_price: float | None = Query(None, ge=0, description="Минимальная цена товара"),
+    max_price: float | None = Query(None, ge=0, description="Максимальная цена товара"),
+    in_stock: bool | None = Query(
+        None, description="true — только товары в наличии, false — только без остатка"
+    ),
+    seller_id: int | None = Query(None, description="ID продавца для фильтрации"),
 ) -> ProductList:
     """Возвращает список всех активных товаров."""
 
-    total_stmt = (
-        select(func.count()).select_from(ProductModel).where(ProductModel.is_active.is_(True))
-    )
+    if min_price is not None and max_price is not None and min_price > max_price:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="min_price не может быть больше max_price",
+        )
+
+    filters = [ProductModel.is_active.is_(True)]
+
+    if category_id is not None:
+        filters.append(ProductModel.category_id == category_id)
+    if min_price is not None:
+        filters.append(ProductModel.price >= min_price)
+    if max_price is not None:
+        filters.append(ProductModel.price <= max_price)
+    if in_stock is not None:
+        filters.append(ProductModel.stock > 0 if in_stock else ProductModel.stock == 0)
+    if seller_id is not None:
+        filters.append(ProductModel.seller_id == seller_id)
+
+    total_stmt = select(func.count()).select_from(ProductModel).where(*filters)
     total = await db.scalar(total_stmt) or 0
 
     product_stmt = await db.scalars(
         select(ProductModel)
-        .where(ProductModel.is_active.is_(True))
+        .where(*filters)
         .order_by(ProductModel.id)
         .offset((page - 1) * page_size)
         .limit(page_size)
