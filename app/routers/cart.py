@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -125,3 +125,22 @@ async def update_cart_item(
     updated_item = await _get_cart_item(db, current_user.id, product_id)
 
     return CartItemSchema.model_validate(updated_item)
+
+
+@router.delete("//items/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_item_from_cart(
+    product_id: int, db: AsyncSessionDep, current_user: CurrentUserDep
+) -> Response:
+    """Эндпоинт для удаления товара из корзины."""
+
+    cart_item = await _get_cart_item(db, current_user.id, product_id)
+    if not cart_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Товар в корзине не найден",
+        )
+
+    await db.delete(cart_item)
+    await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
