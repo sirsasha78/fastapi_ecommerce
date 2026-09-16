@@ -159,7 +159,9 @@ async def get_all_products(
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
-        items = (await db.scalars(products_stmt)).all()
+        items: list[ProductSchema] = [
+            ProductSchema.model_validate(item) for item in (await db.scalars(products_stmt)).all()
+        ]
 
     return ProductList(
         items=items,
