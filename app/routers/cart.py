@@ -10,7 +10,7 @@ from app.models.cart_items import CartItem as CartItemModel
 from app.models.products import Product as ProductModel
 from app.schemas import Cart as CartSchema
 from app.schemas import CartItem as CartItemSchema
-from app.schemas import CartItemCreate
+from app.schemas import CartItemCreate, CartItemUpdate
 
 router = APIRouter(
     prefix="/cart",
@@ -53,7 +53,7 @@ async def _get_cart_item(
 
 @router.get("/", response_model=CartSchema)
 async def get_cart(db: AsyncSessionDep, current_user: CurrentUserDep) -> CartSchema:
-    """Эндпоинт, который отвечает за получение данных корзины пользователя"""
+    """Эндпоинт, который отвечает за получение данных корзины пользователя."""
 
     result = await db.scalars(
         select(CartItemModel)
@@ -83,7 +83,7 @@ async def get_cart(db: AsyncSessionDep, current_user: CurrentUserDep) -> CartSch
 async def add_item_to_cart(
     payload: CartItemCreate, db: AsyncSessionDep, current_user: CurrentUserDep
 ) -> CartItemSchema:
-    """Эндпоинт отвечающий за добавление товара в корзину"""
+    """Эндпоинт отвечающий за добавление товара в корзину."""
 
     await _ensure_product_available(db, payload.product_id)
     cart_item = await _get_cart_item(db, current_user.id, payload.product_id)
@@ -100,8 +100,28 @@ async def add_item_to_cart(
 
     await db.commit()
     await db.refresh(cart_item)
-    updated_item = CartItemSchema.model_validate(
-        await _get_cart_item(db, current_user.id, payload.product_id)
-    )
+    updated_item = await _get_cart_item(db, current_user.id, payload.product_id)
 
-    return updated_item
+    return CartItemSchema.model_validate(updated_item)
+
+
+@router.put("/items/{product_id}", response_model=CartItemSchema)
+async def update_cart_item(
+    product_id: int, payload: CartItemUpdate, db: AsyncSessionDep, current_user: CurrentUserDep
+) -> CartItemSchema:
+    """Эндпоинт отвечающий за обновление количества товаров в корзине."""
+    await _ensure_product_available(db, product_id)
+
+    cart_item = await _get_cart_item(db, current_user.id, product_id)
+    if not cart_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Товар в корзине не найден",
+        )
+
+    cart_item.quantity = payload.quantity
+    await db.commit()
+    await db.refresh(cart_item)
+    updated_item = await _get_cart_item(db, current_user.id, product_id)
+
+    return CartItemSchema.model_validate(updated_item)
