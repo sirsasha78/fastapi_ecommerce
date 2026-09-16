@@ -10,6 +10,7 @@ from app.models.cart_items import CartItem as CartItemModel
 from app.models.products import Product as ProductModel
 from app.schemas import Cart as CartSchema
 from app.schemas import CartItem as CartItemSchema
+from app.schemas import CartItemCreate
 
 router = APIRouter(
     prefix="/cart",
@@ -76,3 +77,31 @@ async def get_cart(db: AsyncSessionDep, current_user: CurrentUserDep) -> CartSch
         total_quantity=total_quantity,
         total_price=total_price_decimal,
     )
+
+
+@router.post("/items", response_model=CartItemSchema, status_code=status.HTTP_201_CREATED)
+async def add_item_to_cart(
+    payload: CartItemCreate, db: AsyncSessionDep, current_user: CurrentUserDep
+) -> CartItemSchema:
+    """Эндпоинт отвечающий за добавление товара в корзину"""
+
+    await _ensure_product_available(db, payload.product_id)
+    cart_item = await _get_cart_item(db, current_user.id, payload.product_id)
+
+    if cart_item:
+        cart_item.quantity += payload.quantity
+    else:
+        cart_item = CartItemModel(
+            user_id=current_user.id,
+            product_id=payload.product_id,
+            quantity=payload.quantity,
+        )
+        db.add(cart_item)
+
+    await db.commit()
+    await db.refresh(cart_item)
+    updated_item = CartItemSchema.model_validate(
+        await _get_cart_item(db, current_user.id, payload.product_id)
+    )
+
+    return updated_item
