@@ -32,7 +32,7 @@ class Order(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="orders")
     items: Mapped[list["OrderItem"]] = relationship(
-        "OrderItem", back_populates="orders", cascade="all, delete-orphan"
+        "OrderItem", back_populates="order", cascade="all, delete-orphan"
     )
 
 
