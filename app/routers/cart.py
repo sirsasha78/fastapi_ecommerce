@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from app.auth import CurrentUserDep
@@ -141,6 +141,16 @@ async def remove_item_from_cart(
         )
 
     await db.delete(cart_item)
+    await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_cart(db: AsyncSessionDep, current_user: CurrentUserDep) -> Response:
+    """Эндпоинт для полной очистки корзины"""
+
+    await db.execute(delete(CartItemModel).where(CartItemModel.user_id == current_user.id))
     await db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
