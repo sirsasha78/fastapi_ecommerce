@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import delete, select
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,7 @@ from app.models.cart_items import CartItem as CartItemModel
 from app.models.orders import Order as OrderModel
 from app.models.orders import OrderItem as OrderItemModel
 from app.schemas import Order as OrderSchema
+from app.schemas import OrderList
 
 router = APIRouter(
     prefix="/orders",
@@ -28,6 +29,36 @@ async def _load_order_with_items(db: AsyncSession, order_id: int) -> OrderModel 
     )
 
     return result.first()
+
+
+@router.get("/", response_model=OrderList)
+async def list_orders(
+    db: AsyncSessionDep,
+    current_user: CurrentUserDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+) -> OrderList:
+    """Возвращает заказы текущего пользователя с простой пагинацией."""
+
+    total = await db.scalar(
+        select(func.count(OrderModel.id)).where(OrderModel.user_id == current_user.id)
+    )
+    result = await db.scalars(
+        select(OrderModel)
+        .options(selectinload(OrderModel.items).selectinload(OrderItemModel.product))
+        .where(OrderModel.user_id == current_user.id)
+        .order_by(OrderModel.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    orders: list[OrderSchema] = [OrderSchema.model_validate(item) for item in result.all()]
+
+    return OrderList(
+        items=orders,
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/checkout", response_model=OrderSchema, status_code=status.HTTP_201_CREATED)
