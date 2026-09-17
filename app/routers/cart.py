@@ -127,7 +127,7 @@ async def update_cart_item(
     return CartItemSchema.model_validate(updated_item)
 
 
-@router.delete("//items/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/items/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_item_from_cart(
     product_id: int, db: AsyncSessionDep, current_user: CurrentUserDep
 ) -> Response:
