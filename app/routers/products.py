@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import desc, func, select, update
 
 from app.auth import CurrentSellerDep
@@ -216,19 +216,25 @@ async def get_all_products(
 
 @router.post("/", response_model=ProductSchema, status_code=status.HTTP_201_CREATED)
 async def create_product(
-    product: ProductCreate,
+    product: Annotated[ProductCreate, Form(media_type="multipart/form-data")],
     db: AsyncSessionDep,
     _category: ProductCategoryDep,
     current_user: CurrentSellerDep,
-) -> ProductModel:
+) -> ProductSchema:
     """Создаёт новый товар, привязанный к текущему продавцу (только для 'seller')."""
 
-    db_product = ProductModel(**product.model_dump(), seller_id=current_user.id)
+    image_url = await save_product_image(product.image) if product.image else None
+
+    db_product = ProductModel(
+        **product.model_dump(exclude={"image"}),
+        seller_id=current_user.id,
+        image_url=image_url,
+    )
     db.add(db_product)
     await db.commit()
     await db.refresh(db_product)
 
-    return db_product
+    return ProductSchema.model_validate(db_product)
 
 
 @router.get("/category/{category_id}", response_model=list[ProductSchema])
@@ -273,7 +279,8 @@ async def update_product(
     db: AsyncSessionDep,
     product: ProductDep,
     current_user: CurrentSellerDep,
-) -> ProductModel:
+    image: UploadFile | None = File(None),
+) -> ProductSchema:
     """Обновляет товар, если он принадлежит текущему продавцу (только для 'seller')."""
 
     if product.seller_id != current_user.id:
@@ -289,16 +296,21 @@ async def update_product(
         .where(ProductModel.id == product_id)
         .values(**product_create.model_dump())
     )
+
+    if image:
+        remove_product_image(product.image_url)
+        product.image_url = await save_product_image(image)
+
     await db.commit()
     await db.refresh(product)
 
-    return product
+    return ProductSchema.model_validate(product)
 
 
 @router.delete("/{product_id}", response_model=ProductSchema, status_code=status.HTTP_200_OK)
 async def delete_product(
     db: AsyncSessionDep, product: ProductDep, current_user: CurrentSellerDep
-) -> ProductModel:
+) -> ProductSchema:
     """
     Выполняет мягкое удаление товара, если он принадлежит текущему продавцу (только для 'seller').
     """
@@ -309,8 +321,11 @@ async def delete_product(
             detail="Вы можете удалять только свои собственные продукты",
         )
 
+    remove_product_image(product.image_url)
+
+    product.image_url = None
     product.is_active = False
     await db.commit()
     await db.refresh(product)
 
-    return product
+    return ProductSchema.model_validate(product)
