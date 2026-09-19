@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import desc, func, select, update
 
 from app.auth import CurrentSellerDep
@@ -275,11 +275,11 @@ async def get_reviews_by_product(db: AsyncSessionDep, product: ProductDep) -> li
 @router.put("/{product_id}", response_model=ProductSchema)
 async def update_product(
     product_id: int,
-    product_create: ProductCreate,
+    product_create: Annotated[ProductCreate, Form(media_type="multipart/form-data")],
     db: AsyncSessionDep,
     product: ProductDep,
     current_user: CurrentSellerDep,
-    image: UploadFile | None = File(None),
+    # image: UploadFile | None = File(None),
 ) -> ProductSchema:
     """Обновляет товар, если он принадлежит текущему продавцу (только для 'seller')."""
 
@@ -294,12 +294,12 @@ async def update_product(
     await db.execute(
         update(ProductModel)
         .where(ProductModel.id == product_id)
-        .values(**product_create.model_dump())
+        .values(**product_create.model_dump(exclude={"image"}))
     )
 
-    if image:
+    if product_create.image:
         remove_product_image(product.image_url)
-        product.image_url = await save_product_image(image)
+        product.image_url = await save_product_image(product_create.image)
 
     await db.commit()
     await db.refresh(product)
