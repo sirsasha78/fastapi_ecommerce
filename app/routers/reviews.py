@@ -10,7 +10,7 @@ from app.schemas import ReviewCreate, ReviewRead
 
 router = APIRouter(
     prefix="/reviews",
-    tags=["reviews"],
+    tags=["reviews-v1"],
 )
 
 

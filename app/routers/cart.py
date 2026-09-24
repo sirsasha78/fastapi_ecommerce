@@ -14,7 +14,7 @@ from app.schemas import CartItemCreate, CartItemUpdate
 
 router = APIRouter(
     prefix="/cart",
-    tags=["cart"],
+    tags=["cart-v1"],
 )
 
 

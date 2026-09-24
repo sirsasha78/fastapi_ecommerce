@@ -10,12 +10,12 @@ app = FastAPI(
 
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
-app.include_router(categories.router)
-app.include_router(products.router)
-app.include_router(users.router)
-app.include_router(reviews.router)
-app.include_router(cart.router)
-app.include_router(orders.router)
+app.include_router(categories.router, prefix="/api/v1")
+app.include_router(products.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(reviews.router, prefix="/api/v1")
+app.include_router(cart.router, prefix="/api/v1")
+app.include_router(orders.router, prefix="/api/v1")
 
 
 @app.get("/")

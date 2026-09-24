@@ -14,7 +14,7 @@ from app.schemas import User as UserSchema
 
 router = APIRouter(
     prefix="/users",
-    tags=["users"],
+    tags=["users-v1"],
 )
 
 FormDataDep = Annotated[OAuth2PasswordRequestForm, Depends()]

@@ -9,7 +9,7 @@ from app.schemas import CategoryCreate
 
 router = APIRouter(
     prefix="/categories",
-    tags=["categories"],
+    tags=["categories-v1"],
 )
 
 

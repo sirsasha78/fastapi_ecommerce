@@ -15,7 +15,7 @@ from app.schemas import OrderList
 
 router = APIRouter(
     prefix="/orders",
-    tags=["orders"],
+    tags=["orders-v1"],
 )
 
 

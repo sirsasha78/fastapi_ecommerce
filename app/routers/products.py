@@ -21,7 +21,7 @@ MAX_IMAGE_SIZE = 2 * 1024 * 1024
 
 router = APIRouter(
     prefix="/products",
-    tags=["products"],
+    tags=["products-v1"],
 )
 
 
