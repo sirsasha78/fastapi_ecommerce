@@ -279,7 +279,6 @@ async def update_product(
     db: AsyncSessionDep,
     product: ProductDep,
     current_user: CurrentSellerDep,
-    # image: UploadFile | None = File(None),
 ) -> ProductSchema:
     """Обновляет товар, если он принадлежит текущему продавцу (только для 'seller')."""
 

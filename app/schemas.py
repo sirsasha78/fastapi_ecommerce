@@ -5,6 +5,8 @@ from typing import Annotated
 from fastapi import UploadFile
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.models.users import UserRole
+
 
 class CategoryCreate(BaseModel):
     """
@@ -67,10 +69,8 @@ class UserCreate(BaseModel):
     email: Annotated[EmailStr, Field(description="Email пользователя")]
     password: Annotated[str, Field(min_length=8, description="Пароль (минимум 8 символов)")]
     role: Annotated[
-        str,
-        Field(
-            default="buyer", pattern="^(buyer|seller)$", description="Роль: 'buyer' или 'seller'"
-        ),
+        UserRole,
+        Field(default=UserRole.BUYER, description="Роль: 'buyer' или 'seller'"),
     ]
 
 
@@ -80,7 +80,7 @@ class User(BaseModel):
     id: int
     email: EmailStr
     is_active: bool
-    role: str
+    role: UserRole
     model_config = ConfigDict(from_attributes=True)
 
 
